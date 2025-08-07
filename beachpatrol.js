@@ -34,6 +34,8 @@ Options:
       Supported browsers: ${SUPPORTED_BROWSERS.join(", ")}
   --incognito               Launch browser in incognito mode.
   --headless                Launch browser in headless mode.
+  --ignore-https-errors     Ignore HTTPS errors.
+  --proxy-server <server>   Use a proxy server.
   --help                    Show this help message.
   --version                 Show version. 
 `.trimStart(),
@@ -64,6 +66,15 @@ let headless = false;
 if (process.argv.includes("--headless")) {
   headless = true;
 }
+let ignoreHttpsErrors = false;
+if (process.argv.includes("--ignore-https-errors")) {
+  ignoreHttpsErrors = true;
+}
+let proxyServer = null;
+if (process.argv.includes("--proxy-server")) {
+  const proxyIndex = process.argv.indexOf("--proxy-server");
+  proxyServer = process.argv[proxyIndex + 1];
+}
 let browser = "chromium";
 if (process.argv.includes("--browser")) {
   const browserIndex = process.argv.indexOf("--browser");
@@ -90,10 +101,23 @@ const browserCommand = browser === "chromium" ? chromium : firefox;
 // prepare launch options and hide automation
 const launchOptions = {
   headless: headless,
+  ignoreHTTPSErrors: ignoreHttpsErrors,
   viewport: null, // Let browser decide viewport
   args: [],
   ignoreDefaultArgs: ["--enable-automation"], // No "controlled by automation" infobar
 };
+
+// In Docker/Linux environments where we install chromium via a package manager,
+// we need to tell Playwright where to find the executable.
+const systemBrowserPath = '/usr/bin/chromium-browser';
+if (fs.existsSync(systemBrowserPath)) {
+  launchOptions.executablePath = systemBrowserPath;
+  // Chromium on Alpine runs as root, so we need to disable the sandbox
+  launchOptions.args.push('--no-sandbox');
+}
+if (proxyServer) {
+  launchOptions.proxy = { server: proxyServer };
+}
 if (!process.env.CI) {
   // The Chromium sandbox must be disabled for CI to pass
   launchOptions["chromiumSandbox"] = true;
@@ -262,14 +286,17 @@ const server = createServer((socket) => {
           `${moduleURL}?t=${Date.now()}`
         );
 
-        await command(browserContext, ...args);
+        const result = await command(browserContext, ...args);
+        const resultString = JSON.stringify(result, null, 2);
+        const encodedResult = Buffer.from(resultString).toString("base64");
         const SUCCESS_MESSAGE = "Command executed successfully.";
         console.log(SUCCESS_MESSAGE);
-        socket.write(`${SUCCESS_MESSAGE}\n`);
+        socket.write(`${encodedResult}\n`);
       } catch (error) {
         const ERROR_MESSAGE = `Error: Failed to execute command. ${error.message}`;
-        console.log(ERROR_MESSAGE);
-        socket.write(`${ERROR_MESSAGE}\n`);
+        console.error(ERROR_MESSAGE);
+        const encodedError = Buffer.from(ERROR_MESSAGE).toString("base64");
+        socket.write(`${encodedError}\n`);
       }
     }
   });

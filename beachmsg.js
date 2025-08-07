@@ -67,7 +67,13 @@ const client = connect(endpoint, () => {
 });
 
 client.on("data", (data) => {
-  process.stdout.write(data.toString());
+  const encodedData = data.toString().trim();
+  const decodedData = Buffer.from(encodedData, "base64").toString("utf8");
+  if (decodedData.startsWith("Error:")) {
+    console.error(decodedData);
+  } else {
+    process.stdout.write(decodedData);
+  }
   client.end(); // End connection after response is received
 });
 
