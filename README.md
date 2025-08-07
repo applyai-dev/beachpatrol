@@ -332,6 +332,32 @@ This project is in **alpha**.
 
 MIT
 
+## Running with Docker
+
+You can also run the provided API server using Docker. This is a convenient way to run the service in an isolated environment without needing to manage Node.js or dependencies on your host machine.
+
+**1. Build the Docker image:**
+
+```bash
+docker build -t beachpatrol-api .
+```
+
+**2. Run the Docker container:**
+
+```bash
+docker run --rm -p 3000:3000 beachpatrol-api
+```
+
+This will start the API server and map port 3000 on your host to port 3000 in the container.
+
+**3. Test the API:**
+
+You can now send requests to the server using `curl` or any other HTTP client:
+
+```bash
+curl http://localhost:3000/visit/www.google.com
+```
+
 ## Contributing
 
 We welcome contributions of all kinds. If you have a suggestion or fix, please
